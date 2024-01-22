@@ -1,0 +1,169 @@
+import pygame
+from math import sin
+from math import sqrt
+from numpy.random import randint
+import time
+
+
+class Player:
+    def __init__(self, x, y):
+        self.image = pygame.image.load('Space_Ship.jpg')
+        self.image = pygame.transform.scale(self.image, (100, 67))
+        self.player_rect = self.image.get_rect(topleft=(1000, 700))
+        self.player_rect.x, self.player_rect.y = x, y
+        self.screen = pygame.display.set_mode((1000, 700))
+        self.screen_rect = self.screen.get_rect()
+
+    def move(self, keys):
+        if keys[pygame.K_a]:
+            self.player_rect.x -= 5
+        if keys[pygame.K_d]:
+            self.player_rect.x += 5
+        if keys[pygame.K_w]:
+            self.player_rect.y -= 5
+        if keys[pygame.K_s]:
+            self.player_rect.y += 5
+        self.player_rect.clamp_ip(self.screen_rect)
+
+    def draw(self, screen):
+        screen.blit(self.image, (self.player_rect.x, self.player_rect.y))
+
+
+class Ball:
+    def __init__(self, x, y, size, speed, offset):
+        self.image = pygame.image.load('Snipped_Asteroid.JPG')
+        self.bx, self.by = x, y
+        self.size = size
+        self.speed = speed
+        self.offset = offset
+        self.image = pygame.transform.scale(self.image, self.size)
+
+    def move(self, time):
+        self.by += sin(time * 0.02 + self.offset) * self.speed
+        if self.by < 0 or self.by > 700:
+            self.speed = -self.speed
+
+    def draw(self, screen):
+        screen.blit(self.image, (self.bx, self.by))
+
+    def __getitem__(self, index):
+        return self.bx, self.by
+
+
+class Human:
+    def __init__(self, x, y):
+        self.hx = x
+        self.hy = y
+        self.image = pygame.image.load('Abducted_Human.jpg')
+        self.random_size = randint(20, 60)
+        self.image = pygame.transform.scale(self.image, (self.random_size, self.random_size))
+
+    def draw(self, screen):
+        screen.blit(self.image, (self.hx, self.hy))
+
+    def __getitem__(self, index):
+        return self.hx, self.hy, self.random_size
+
+
+class Game:
+    def __init__(self):
+        pygame.init()
+
+        self.screen = pygame.display.set_mode((1000, 700))
+        self.screen_rect = self.screen.get_rect()
+        self.background = pygame.image.load('Space_Background.jpg')
+        self.background = pygame.transform.scale(self.background, (1000, 700))
+        pygame.display.set_caption('CS Ball Game')
+
+        self.player = Player(500, 350)
+
+        self.balls = []
+        self.balls_x_y = [[ball[0], ball[1]] for ball in self.balls]
+
+        for x in range(2):
+            for i in range(10):
+                self.balls.append(Ball(100 * i, 0, (randint(50, 200), randint(50, 200)), randint(1, 5), randint(1, 6)))
+        self.running = True
+        self.time = pygame.time.get_ticks()
+
+        self.lives = 3
+        self.collision_cooldown = 1
+        self.last_collision_time = 0
+
+        self.human = Human(randint(50, 1000), randint(50, 700))
+        self.last_human_retrieval = 0
+        self.humans_retrieved = 0
+
+        self.font = pygame.font.Font('freesansbold.ttf', 32)
+        self.text = self.font.render('Lives: {}'.format(self.lives), True, (245, 245, 245))
+        self.textRect = self.text.get_rect()
+        self.textRect.center = (50, 50)
+        self.humanText = self.font.render('Humans retrieved: {}'.format(self.humans_retrieved), True, (50, 150, 120))
+        self.humanTextRect = self.humanText.get_rect()
+
+    def run(self):
+        while self.running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    pygame.quit()
+
+            keys = pygame.key.get_pressed()
+
+            self.player.move(keys)
+            self.player.player_rect.clamp_ip(self.screen_rect)
+            for ball in self.balls:
+                self.balls[self.balls.index(ball)].move(self.time)
+
+            self.screen.fill((255, 255, 255))
+            self.screen.blit(self.background, (0, 0))
+
+            self.player.draw(self.screen)
+            for ball in self.balls:
+                ball.draw(self.screen)
+            self.screen.blit(self.text, self.textRect)
+            self.screen.blit(self.humanText, self.humanTextRect)
+
+            clock = pygame.time.Clock()
+            clock.tick(60)
+            current_time = time.time()
+
+            if current_time - self.last_human_retrieval > 10:
+                self.human.draw(self.screen)
+                x_diff = self.human[1][0] - self.player.player_rect.x
+                y_diff = self.human[1][1] - self.player.player_rect.y
+                distance = sqrt(x_diff ** 2 + y_diff ** 2)
+                if distance < self.human[1][2]:
+                    self.humans_retrieved += 1
+                    if self.humans_retrieved < 5:
+                        col = (100, 100, 100)
+                    elif self.humans_retrieved < 15:
+                        col = (200, 100, 50)
+                    else:
+                        col = (150, 200, 230)
+                    self.humanText = self.font.render('Humans Retrieved: {}'.format(self.humans_retrieved), False, col)
+                    self.last_human_retrieval = current_time
+
+            pygame.display.flip()
+
+            if current_time - self.last_collision_time > self.collision_cooldown:
+                for ball in self.balls:
+                    x_diff = ball[1][0] - self.player.player_rect.x
+                    y_diff = ball[1][1] - self.player.player_rect.y
+                    distance = sqrt(x_diff ** 2 + y_diff ** 2)
+                    if distance < 70:
+                        self.lives -= 1
+                        if self.lives == 2:
+                            color = (245, 10, 255)
+                        else:
+                            color = (245, 10, 10)
+                        self.text = self.font.render('Lives: {}'.format(self.lives), False, color)
+                        self.last_collision_time = current_time
+
+            if self.lives < 1:
+                self.running = False
+
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()
