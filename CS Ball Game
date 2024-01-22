@@ -141,6 +141,7 @@ class Game:
                         col = (200, 100, 50)
                     else:
                         col = (150, 200, 230)
+                    self.human = Human(randint(50, 1000), randint(50, 700))
                     self.humanText = self.font.render('Humans Retrieved: {}'.format(self.humans_retrieved), False, col)
                     self.last_human_retrieval = current_time
 
